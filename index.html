@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#24150c">
+  <meta name="description" content="U Hořkého kohoutu – 3D hospoda z pohledu první osoby. Čepuješ Radegast, Plzeň, Gambrinus, Kozel i Rebel, naléváš deset druhů panáků, nosíš svíčkovou z kuchyně, najímáš personál, sbíráš sklenice a měníš sudy.">
+  <title>U Hořkého kohoutu – 3D hospoda</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 3D hospoda (WebGL) -->
+  <canvas id="platno"></canvas>
+  <!-- jemná tmavá vinětace přes obraz -->
+  <div class="vineta" aria-hidden="true"></div>
+  <!-- vrstva pro dotykové ovládání (joystick vlevo, rozhlížení vpravo) -->
+  <div id="dotyk-zona" class="dotyk-zona"></div>
+
+  <!-- =====================================================
+       HUD – informace přes hru
+       ===================================================== -->
+  <div id="hud" class="hud" hidden>
+    <div class="hud-vlevo">
+      <div class="hud-panel">
+        <div class="hud-radek penize"><span aria-hidden="true">💰</span><b id="hud-penize">0 Kč</b></div>
+        <div class="hud-radek"><span aria-hidden="true">🍺</span><b id="hud-piva">0</b><small>natočených piv</small></div>
+        <div class="hud-radek hud-hodnoceni" title="Hodnocení hospody"><span class="hvezdy" id="hud-hvezdy">★★★★☆</span><b id="hud-hvezdy-cislo">3.5</b></div>
+        <div class="hud-radek sklenice-radek" title="Čisté sklenice a panákovky">
+          <span id="hud-sklenice-box"><span aria-hidden="true">🥛</span><b id="hud-sklenice">12 / 12</b></span>
+          <span id="hud-panakovky-box"><span aria-hidden="true">🥃</span><b id="hud-panakovky">12 / 12</b></span>
+        </div>
+        <div class="hud-stav zavreno" id="hud-stav">ZAVŘENO</div>
+      </div>
+      <!-- sudy, které docházejí, a objednané dodávky -->
+      <div id="hud-sudy" class="hud-sudy" aria-live="polite"></div>
+      <!-- hosté, kteří něco chtějí -->
+      <div id="objednavky" class="objednavky" aria-label="Hosté, kteří něco chtějí"></div>
+      <!-- lístky z kuchyně -->
+      <div id="hud-kuchyne" class="hud-kuchyne" aria-live="polite" hidden></div>
+    </div>
+
+    <div class="hud-cil" id="hud-cil" hidden></div>
+
+    <div class="hud-vpravo">
+      <button type="button" class="btn-ikona" id="btn-zvuk" aria-label="Zvuk">🔊</button>
+      <button type="button" class="btn-ikona" id="btn-cela" aria-label="Celá obrazovka">⛶</button>
+      <button type="button" class="btn-ikona" id="btn-pauza" aria-label="Pauza">⏸</button>
+    </div>
+
+    <div class="zamerovac" id="zamerovac"></div>
+    <div class="vyzva" id="vyzva" hidden><kbd class="jen-pc">E</kbd><span id="vyzva-text"></span></div>
+    <!-- průběh narážení sudu -->
+    <div class="prubeh" id="prubeh" hidden><div class="prubeh-pln" id="prubeh-pln"></div></div>
+    <div class="hodnoceni" id="hodnoceni"></div>
+    <div class="ruce-info" id="ruce-info" hidden></div>
+
+    <!-- měřidlo čepování: pusť, až bude pěna v zelené zóně -->
+    <div class="mericko" id="mericko" hidden>
+      <div class="m-sklo">
+        <div class="m-zona m-dobre" id="m-dobre"></div>
+        <div class="m-pivo" id="m-pivo"></div>
+        <div class="m-pena" id="m-pena"></div>
+        <div class="m-zona m-perfekt" id="m-perfekt"></div>
+      </div>
+      <b id="m-popis">Radegast 12</b>
+    </div>
+
+    <div id="bubliny" class="vrstva"></div>
+    <div id="plovouci" class="vrstva"></div>
+    <div class="klikni" id="klikni" hidden>🖱️ Klikni do hry a pokračuj</div>
+
+    <!-- dotykové ovládání -->
+    <div class="joy" id="joy" hidden><div class="joy-packa" id="joy-packa"></div></div>
+    <button type="button" class="btn-akce" id="btn-akce"><span id="btn-akce-text">Akce</span></button>
+    <div class="otoc-telefon">↻ Na šířku se hraje líp</div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- =====================================================
+       HLAVNÍ MENU
+       ===================================================== -->
+  <section id="menu" class="menu" aria-labelledby="nadpis-hry">
+    <div class="menu-karta">
+      <svg class="menu-znak" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <radialGradient id="znak-pozadi" cx="50%" cy="38%" r="62%"><stop offset="0" stop-color="#6a3d18"/><stop offset="1" stop-color="#1e1008"/></radialGradient>
+          <linearGradient id="znak-pivo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd556"/><stop offset="1" stop-color="#c06f0c"/></linearGradient>
+        </defs>
+        <circle cx="32" cy="32" r="30" fill="url(#znak-pozadi)" stroke="#f5c542" stroke-width="2.4"/>
+        <circle cx="32" cy="32" r="25.6" fill="none" stroke="#f5c542" stroke-opacity=".35"/>
+        <path d="M41 27.5h3.5a5.5 5.5 0 0 1 5.5 5.5v5a5.5 5.5 0 0 1-5.5 5.5H41" fill="none" stroke="#f3e6c8" stroke-opacity=".85" stroke-width="3.2"/>
+        <rect x="19" y="23" width="22" height="25" rx="3" fill="url(#znak-pivo)"/>
+        <circle cx="25" cy="41" r="1.1" fill="#fff3c4" opacity=".8"/>
+        <circle cx="31" cy="36" r=".9" fill="#fff3c4" opacity=".7"/>
+        <circle cx="35.5" cy="42.5" r="1.2" fill="#fff3c4" opacity=".7"/>
+        <circle cx="28.5" cy="30.5" r=".8" fill="#fff3c4" opacity=".7"/>
+        <path d="M17.5 25.5c-.6-3.4 2.2-5.6 5.3-4.5 1.1-3.3 5.3-4 7.4-1.5 2-2.6 6.2-2.3 7.6.6 3.4-.9 5.8 2 4.6 5.1-.7 1.6-2.3 2-3.6 1.6H21.2c-1.9 0-3.4-.5-3.7-1.3z" fill="#fff8ea"/>
+        <rect x="19" y="23" width="22" height="25" rx="3" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.3"/>
+        <path d="M23.5 29v14" stroke="#fff" stroke-opacity=".4" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <p class="menu-stitek">3D hospoda · výčep, panáky, kuchyně, personál</p>
+      <h1 id="nadpis-hry">U Hořkého kohoutu</h1>
+      <span class="menu-oddelovac" aria-hidden="true"></span>
+      <p class="menu-info" id="menu-info">Stoupni si za pípu a otevři hospodu. V kase máš 10 000 Kč na začátek. Hosté sedají k baru i ke stolům – převezmi objednávku, načepuj pivo, nalij panáka po čárku, dones, vyber peníze a hlídej sudy. V knize si otevřeš kuchyni a najmeš personál.</p>
+      <ul class="menu-piva" aria-label="Piva na čepu">
+        <li style="--b: #ed9e1f">Radegast 10 · 12 · 15</li>
+        <li style="--b: #f2ad2e">Gambrinus</li>
+        <li style="--b: #3d1a0a">Kozel černý</li>
+        <li style="--b: #f0a826">Plzeň</li>
+        <li style="--b: #e69a21">Rebel</li>
+        <li style="--b: #d9a648" class="panak">Becherovka · Fernet · Jägermeister · slivovice · tuzemák · rum · whisky · tequila · zelená · vodka</li>
+        <li style="--b: #c98a3a" class="jidlo">svíčková · guláš · smažák · řízek · utopenec · pivní sýr · topinky · hermelín</li>
+      </ul>
+      <div class="menu-tlacitka">
+        <button type="button" class="btn btn-hlavni btn-velke" id="btn-hrat">🍺 Otevřít hospodu</button>
+        <button type="button" class="btn" id="btn-napoveda-menu">❓ Jak se hraje</button>
+      </div>
+      <p class="menu-ovladani"><b>Počítač:</b> WASD chůze · myš rozhlížení · E / levé tlačítko akce · Shift běh<br><b>Mobil:</b> palcem vlevo chodíš, vpravo se rozhlížíš, velké tlačítko je akce</p>
+      <p class="menu-pata">🔞 Hra pro dospělé · Čepuješ a naléváš, nepiješ · Po alkoholu nikdy za volant</p>
+      <p class="menu-pata drobne">Neoficiální fanouškovská hra. Názvy piv a lihovin patří jejich vlastníkům; hra s výrobci není nijak spojena a nepoužívá jejich loga, etikety ani grafiku.</p>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       PAUZA
+       ===================================================== -->
+  <section id="pauza" class="prekryti" hidden aria-labelledby="pauza-nadpis">
+    <div class="karta karta-uzka">
+      <h2 id="pauza-nadpis">⏸ Pauza</h2>
+      <p>Hospoda stojí, hosté počkají.</p>
+      <button type="button" class="btn btn-hlavni btn-velke btn-plna" id="btn-pokracovat">▶ Pokračovat</button>
+      <button type="button" class="btn btn-plna" id="btn-napoveda">❓ Jak se hraje</button>
+      <button type="button" class="btn btn-plna" id="btn-zvuk-pauza">🔊 Zvuk zapnutý</button>
+      <button type="button" class="btn btn-plna" id="btn-hudba">🎵 Hudba z jukeboxu: zapnutá</button>
+      <button type="button" class="btn btn-plna" id="btn-kvalita">🎨 Grafika: vysoká</button>
+      <label class="nastaveni">Citlivost rozhlížení
+        <input type="range" id="citlivost" min="0.3" max="2.5" step="0.1" value="1">
+      </label>
+      <button type="button" class="btn-odkaz" id="btn-reset">Smazat uložený postup</button>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       KNIHA VYLEPŠENÍ
+       ===================================================== -->
+  <section id="kniha" class="prekryti kniha-prekryti" hidden aria-labelledby="kniha-nadpis">
+    <div class="kniha-obal">
+      <div class="zalozky" role="tablist">
+        <button type="button" class="zalozka aktivni" data-kat="vycep" aria-label="Výčep" title="Výčep">🛠️<span class="zalozka-text"> Výčep</span></button>
+        <button type="button" class="zalozka" data-kat="hospoda" aria-label="Hospoda" title="Hospoda">🏠<span class="zalozka-text"> Hospoda</span></button>
+        <button type="button" class="zalozka" data-kat="kuchyne" aria-label="Kuchyně" title="Kuchyně">🍳<span class="zalozka-text"> Kuchyně</span></button>
+        <button type="button" class="zalozka" data-kat="personal" aria-label="Personál" title="Personál">👥<span class="zalozka-text"> Personál</span></button>
+        <button type="button" class="zalozka" data-kat="sklad" aria-label="Sklad" title="Sklad">🛢️<span class="zalozka-text"> Sklad</span></button>
+        <button type="button" class="zalozka" data-kat="ukoly" aria-label="Úkoly" title="Úkoly">🏆<span class="zalozka-text"> Úkoly</span></button>
+        <button type="button" class="zalozka" data-kat="zaznamy" aria-label="Záznamy" title="Záznamy">📊<span class="zalozka-text"> Záznamy</span></button>
+      </div>
+      <div class="kniha-hlava">
+        <span id="kniha-nadpis">📖 Kniha hospody</span>
+        <b class="kniha-penize" id="kniha-penize">0 Kč</b>
+        <button type="button" class="kniha-zavrit" id="btn-zavrit-knihu">Zavřít ✕</button>
+      </div>
+      <div class="stranky">
+        <div class="stranka" id="kniha-leva"></div>
+        <div class="stranka" id="kniha-prava"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       NÁPOVĚDA
+       ===================================================== -->
+  <div id="napoveda" class="prekryti" hidden role="dialog" aria-modal="true" aria-labelledby="napoveda-nadpis">
+    <div class="karta karta-siroka">
+      <button type="button" class="zavrit-x" id="btn-zavrit-napovedu" aria-label="Zavřít">✕</button>
+      <h2 id="napoveda-nadpis">❓ Jak se hraje</h2>
+      <ol class="navod">
+        <li><b>Otevři hospodu:</b> dojdi ke dveřím a otoč cedulku na OTEVŘENO. Hosté pak chodí pořád – dokud ji zase neotočíš.</li>
+        <li><b>Bar:</b> kdo si sedne k pultu, rovnou řekne, co chce. Připravíš, podáš a host hned zaplatí.</li>
+        <li><b>Stoly:</b> partičky si sednou ke stolu a mávají ✋. Dojdi k nim, převezmi objednávku a všechno dones. U stolu se pije na čárky – až budou chtít platit 💰, dojdi si pro peníze. Stoly mají čísla, ať je hned najdeš.</li>
+        <li><b>Pivo:</b> za pultem se podívej na kohout s cedulkou a drž akci. Pusť, až bude vršek pěny v zelené zóně 🎯 na měřidle. Každé pivo má svou sklenici.</li>
+        <li><b>Panáky:</b> deset lahví (Becherovka, Fernet, Jägermeister, slivovice, tuzemák, rum, whisky, tequila, zelená, vodka) stojí ve stojanu na zadním pultu vlevo – otoč se zády k výčepu. Podívej se na lahev a drž akci – lahev se nakloní a teče. Pusť, až bude hladina na čárce 0,04 l. Parta si občas objedná rovnou rundu pro všechny.</li>
+        <li><b>Kuchyně:</b> v knize (záložka Kuchyně) otevřeš kuchyni za sálem. Hosté si pak k pivu objednají svíčkovou, guláš, smažák a další jídla. Kuchařka Jarmila je uvaří, dá na výdejní okénko a zazvoní. Vezmi talíř a dones ho ke stolu, dokud je teplý. Prázdné talíře vrať do kuchyně nebo do dřezu.</li>
+        <li><b>Personál:</b> v knize (záložka Personál) najmeš až šest pomocníků: dva sběrače sklenic, dva číšníky a dvě pokladní. Číšníci přijímají objednávky, nosí jídlo z okénka a nápoje, které jim položíš na výdej na konci pultu. Pokladní vybírají peníze. Práci, kterou zrovna děláš ty, ti nechají.</li>
+        <li><b>Sklenice:</b> po hostech zůstávají prázdné sklenice, panákovky a talíře na stolech i na baru. Posbírej je a umyj v dřezu za pultem. Ke stolu se špinavým nádobím si nikdo nesedne.</li>
+        <li><b>Sudy:</b> do sudu se vejde 20 piv. Když dojde, kohout jen prskne – jdi do skladu za barem a u prázdného sudu drž akci, narazíš nový. Náhradní sudy objednáš v knize na záložce Sklad.</li>
+        <li><b>Kniha</b> leží na pultu. Začínáš s 10 000 Kč. Kupuješ v ní rychlejší kohouty, tác, panákovky, až 10 stolů, jukebox s hudbou, televizi s hokejem, kuchyni, personál, větší sudy i další piva (Ratar, Kozel 11, Rebel černý). Na záložce Úkoly najdeš cíle s odměnou.</li>
+        <li><b>Hodnocení ★:</b> pěkné hladinky a rychlá obsluha ho zvedají, naštvaní hosté srážejí. Občas přijde pivní znalec 🎩 – za perfektní hladinku hodnocení hodně stoupne. Když běží v televizi hokej, chodí fanoušci a slaví každý gól.</li>
+      </ol>
+      <h3>Ovládání</h3>
+      <p><b>Počítač:</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> chůze, myš rozhlížení, <kbd>E</kbd> nebo levé tlačítko akce (u kohoutu, lahve a sudu držet), <kbd>Shift</kbd> běh, <kbd>Esc</kbd> pauza.</p>
+      <p><b>Mobil a tablet:</b> palcem vlevo chodíš (joystick), tažením vpravo se rozhlížíš, velké zlaté tlačítko je akce. Nejlíp se hraje na šířku.</p>
+      <p><b>Grafika:</b> v pauze si přepneš kvalitu. Vysoká má skutečné měkké stíny (i od lidí), odrazy na podlaze, pultu a skle, ztmavené kouty a záři kolem světel. Střední je úspornější a hodí se pro telefony. Nízká je nejrychlejší. Když se hra zadrhává, kvalitu si sníží sama.</p>
+      <h3>Skóre</h3>
+      <p>Skóre jsou natočená piva. Perfektní hladinka 🌟 (u panáku přesně po čárku 🎯) dá největší dýško, moc pěny nebo přes čárku 😬 a pod míru 😕 skoro nic. Když to přeteče 💦, čepuješ nebo naléváš znovu.</p>
+      <div class="pripominka">
+        <h3>🍺 Odpovědně</h3>
+        <p>Ve hře pivo i panáky jen čepuješ, naléváš a podáváš – nepiješ. Ve skutečnosti pij s mírou, prokládej alkohol vodou a jídlem a panáky raději vynech. Alkohol nepatří osobám mladším 18 let a <b>nikdy za volant</b> – v Česku platí nulová tolerance, i na kole.</p>
+      </div>
+      <p class="drobne-tmave">Neoficiální fanouškovská hra. Názvy piv a lihovin (Radegast, Pilsner Urquell, Gambrinus, Kozel, Rebel, Becherovka, Fernet, Jägermeister a další) patří jejich vlastníkům; hra s výrobci není nijak spojena a všechna grafika včetně etiket je vlastní.</p>
+    </div>
+  </div>
+
+  <div id="potvrzeni" class="prekryti" hidden role="dialog" aria-modal="true">
+    <div class="karta karta-uzka">
+      <p>Opravdu smazat celý postup? Přijdeš o peníze, vylepšení, piva i záznamy hospody.</p>
+      <button type="button" class="btn btn-nebezpeci btn-plna" id="btn-reset-ano">Ano, smazat</button>
+      <button type="button" class="btn btn-plna" id="btn-reset-ne">Zrušit</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
