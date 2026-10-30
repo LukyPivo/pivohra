@@ -116,6 +116,15 @@
         <button type="button" class="btn btn-hlavni btn-velke" id="btn-hrat">🍺 Otevřít hospodu</button>
         <button type="button" class="btn" id="btn-napoveda-menu">❓ Jak se hraje</button>
       </div>
+      <!-- admin kód: správný kód přidá při každém zadání peníze do kasy -->
+      <details class="admin-kod">
+        <summary>🔑 Admin kód</summary>
+        <form class="admin-form" data-admin autocomplete="off">
+          <input type="text" name="kod" maxlength="32" placeholder="Zadej kód" aria-label="Admin kód" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+          <button type="submit" class="btn btn-maly">Použít</button>
+          <p class="admin-zprava" role="status" aria-live="polite"></p>
+        </form>
+      </details>
       <p class="menu-ovladani"><b>Počítač:</b> WASD chůze · myš rozhlížení · E / levé tlačítko akce · Shift běh<br><b>Mobil:</b> palcem vlevo chodíš, vpravo se rozhlížíš, velké tlačítko je akce</p>
       <p class="menu-pata">🔞 Hra pro dospělé · Čepuješ a naléváš, nepiješ · Po alkoholu nikdy za volant</p>
       <p class="menu-pata drobne">Neoficiální fanouškovská hra. Názvy piv a lihovin patří jejich vlastníkům; hra s výrobci není nijak spojena a nepoužívá jejich loga, etikety ani grafiku.</p>
@@ -137,6 +146,14 @@
       <label class="nastaveni">Citlivost rozhlížení
         <input type="range" id="citlivost" min="0.3" max="2.5" step="0.1" value="1">
       </label>
+      <details class="admin-kod admin-svetly">
+        <summary>🔑 Admin kód</summary>
+        <form class="admin-form" data-admin autocomplete="off">
+          <input type="text" name="kod" maxlength="32" placeholder="Zadej kód" aria-label="Admin kód" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+          <button type="submit" class="btn btn-maly">Použít</button>
+          <p class="admin-zprava" role="status" aria-live="polite"></p>
+        </form>
+      </details>
       <button type="button" class="btn-odkaz" id="btn-reset">Smazat uložený postup</button>
     </div>
   </section>

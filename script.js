@@ -44,6 +44,8 @@ const NASTAVENI = {
   kapacitaVydeje: 8,       // kolik nápojů se vejde na výdej pro číšníky
   unosnostCisnika: 4,      // kolik nápojů (nebo 2 talíře) unese číšník na tácu
   unosnostSberace: 6,      // kolik prázdných sklenic a talířů unese sběrač
+  adminKod: 'rada15',      // admin kód z menu (velikost písmen nevadí)
+  adminOdmena: 10000,      // kolik korun přidá každé zadání admin kódu
   klicUlozeni: 'hospodaRadegast3D.v3'
 };
 
@@ -9407,6 +9409,42 @@ function pokracuj() {
 function otevriNapovedu() { $('napoveda').hidden = false; }
 function zavriNapovedu() { $('napoveda').hidden = true; }
 
+// Text v hlavním menu podle stavu kasy (nová hospoda / návrat)
+function aktualizujMenuInfo() {
+  if (HRA.natoceno) {
+    $('menu-info').textContent = `Vítej zpátky! Natočeno ${HRA.natoceno} piv, v kase ${ceskaMena(HRA.penize)}, hodnocení ${HRA.hodnoceni.toFixed(1)} ★.`;
+    $('btn-hrat').textContent = '🍺 Pokračovat v hospodě';
+  } else {
+    $('menu-info').textContent = `Stoupni si za pípu a otevři hospodu. V kase máš ${ceskaMena(HRA.penize)} na začátek. Hosté sedají k baru i ke stolům – převezmi objednávku, načepuj pivo, nalij panáka po čárku, dones, vyber peníze a hlídej sudy. V knize si otevřeš kuchyni a najmeš personál.`;
+  }
+}
+
+// Admin kód (v menu i v pauze): každé zadání správného kódu přidá do kasy peníze
+function pouzijAdminKod(formular) {
+  const pole = formular.elements.kod;
+  const zprava = formular.querySelector('.admin-zprava');
+  const kod = pole.value.trim().toLowerCase();
+  pole.value = '';
+  formular.classList.remove('zatres', 'prijato');
+  void formular.offsetWidth; // ať se animace spustí znovu i při opakovaném zadání
+  if (kod && kod === String(NASTAVENI.adminKod).toLowerCase()) {
+    HRA.penize += NASTAVENI.adminOdmena;
+    ulozHru();
+    zvuk.start();
+    zvuk.kasa();
+    zprava.textContent = `✅ +${ceskaMena(NASTAVENI.adminOdmena)} · v kase je ${ceskaMena(HRA.penize)}`;
+    zprava.className = 'admin-zprava ok';
+    formular.classList.add('prijato');
+    if (REZIM === 'menu') aktualizujMenuInfo();
+  } else {
+    zprava.textContent = kod ? '❌ Neplatný kód' : 'Napiš kód a potvrď.';
+    zprava.className = 'admin-zprava chyba';
+    formular.classList.add('zatres');
+    zvuk.chyba();
+  }
+  pole.focus();
+}
+
 const NAZVY_KVALITY = { vysoka: 'vysoká', stredni: 'střední', nizka: 'nízká' };
 function aktualizujTlacitkoZvuku() {
   $('btn-zvuk').textContent = HRA.nastaveni.zvuk ? '🔊' : '🔇';
@@ -9446,10 +9484,8 @@ function pripravUI() {
     hudVlevo: document.querySelector('.hud-vlevo'), hudVpravo: document.querySelector('.hud-vpravo'),
     mPivo: $('m-pivo'), mPena: $('m-pena'), mPerfekt: $('m-perfekt'), mDobre: $('m-dobre'), mPopis: $('m-popis')
   });
-  if (HRA.natoceno) {
-    $('menu-info').textContent = `Vítej zpátky! Natočeno ${HRA.natoceno} piv, v kase ${ceskaMena(HRA.penize)}, hodnocení ${HRA.hodnoceni.toFixed(1)} ★.`;
-    $('btn-hrat').textContent = '🍺 Pokračovat v hospodě';
-  }
+  aktualizujMenuInfo();
+  document.querySelectorAll('form[data-admin]').forEach((f) => f.addEventListener('submit', (e) => { e.preventDefault(); pouzijAdminKod(f); }));
   $('btn-hrat').addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') prepniNaDotyk(); });
   $('btn-hrat').addEventListener('click', zacniHru);
   $('btn-napoveda-menu').addEventListener('click', otevriNapovedu);
